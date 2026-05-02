@@ -2,24 +2,22 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
+
+	"github.com/google/uuid"
 )
 
 func (s *Server) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id == 0 {
-		http.Error(w, "Invalid id parameter", http.StatusBadRequest)
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
 		return
 	}
 
-	err = s.repo.DeleteAccount(id)
+	err = s.accRepo.DeleteAccount(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,11 +1,20 @@
 package handlers
 
-import "ledger-system/repository"
+import (
+	"database/sql"
+	"ledger-system/repository"
+)
 
 type Server struct {
-	repo *repository.AccountRepository
+	accRepo   *repository.AccountRepository
+	entryRepo *repository.EntryRepository
+	db        *sql.DB
 }
 
-func NewServer(repo *repository.AccountRepository) *Server {
-	return &Server{repo: repo}
+func NewServer(accRepo *repository.AccountRepository, entryRepo *repository.EntryRepository, db *sql.DB) *Server {
+	return &Server{
+		accRepo:   accRepo,
+		entryRepo: entryRepo,
+		db:        db,
+	}
 }

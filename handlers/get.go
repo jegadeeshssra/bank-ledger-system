@@ -3,22 +3,22 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"ledger-system/repository"
+
+	"github.com/google/uuid"
 )
 
 func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
 	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id == 0 {
-		http.Error(w, "Invalid id parameter (must be a valid integer ID)", http.StatusBadRequest)
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
 		return
 	}
 
-	acc, err := s.repo.GetAccount(id)
+	acc, err := s.accRepo.GetAccount(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -32,16 +32,78 @@ func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ListAccounts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	accounts, err := s.accRepo.ListAccounts()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if accounts == nil {
+		accounts = []repository.Account{}
+	}
+	json.NewEncoder(w).Encode(accounts)
+}
 
-	accounts, err := s.repo.ListAccounts()
+func (s *Server) GetEntries(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
+		return
+	}
+
+	entries, err := s.entryRepo.GetEntriesByAccountID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if entries == nil {
+		entries = []repository.Entry{}
+	}
+	json.NewEncoder(w).Encode(entries)
+}
+
+// The term reconcile means to make two things consistent that should be equal but might have drifted apart.
+func (s *Server) Reconcile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
+		return
+	}
+
+	balance, err := s.accRepo.CalculateBalance(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if accounts == nil {
-		accounts = []repository.Account{}
+	err = s.accRepo.SetBalance(id, balance)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Reconciled", "balance": balance})
+}
+
+func (s *Server) GetTransaction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid transaction id", http.StatusBadRequest)
+		return
 	}
 
-	json.NewEncoder(w).Encode(accounts)
+	entries, err := s.entryRepo.GetEntriesByTransactionID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(entries) == 0 {
+		http.Error(w, "Transaction not found", http.StatusNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(entries)
 }

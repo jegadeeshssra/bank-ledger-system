@@ -19,23 +19,33 @@ func main() {
 	defer database.Close()
 	fmt.Println("Successfully connected to the database!")
 
-	// 2. Initialize the Account repository
+	// 2. Initialize the Account & Entry repositories
 	accRepo := repository.NewAccountRepository(database)
+	entryRepo := repository.NewEntryRepository(database)
 
-	// 3. Create the table if it doesn't exist
+	// 3. Create the tables if they don't exist
 	err = accRepo.CreateTable()
 	if err != nil {
-		log.Fatal("Error creating table:", err)
+		log.Fatal("Error creating accounts table:", err)
+	}
+	err = entryRepo.CreateTable()
+	if err != nil {
+		log.Fatal("Error creating entries table:", err)
 	}
 
 	// 4. Initialize HTTP Server Handlers
-	srv := handlers.NewServer(accRepo)
+	srv := handlers.NewServer(accRepo, entryRepo, database)
 
 	// Use Go 1.22+ clean method-based routing
 	http.HandleFunc("GET /accounts", srv.ListAccounts)
 	http.HandleFunc("POST /accounts", srv.CreateAccount)
 	http.HandleFunc("GET /accounts/{id}", srv.GetAccount)
-	http.HandleFunc("DELETE /accounts/{id}", srv.DeleteAccount)
+	http.HandleFunc("POST /accounts/{id}/deposit", srv.Deposit)
+	http.HandleFunc("POST /accounts/{id}/withdraw", srv.Withdraw)
+	http.HandleFunc("POST /transfers", srv.Transfer)
+	http.HandleFunc("GET /accounts/{id}/entries", srv.GetEntries)
+	http.HandleFunc("GET /accounts/{id}/reconcile", srv.Reconcile)
+	http.HandleFunc("GET /transactions/{id}", srv.GetTransaction)
 
 	// 5. Start the server on 8081 (since 8080 is used by playing-with-DB)
 	fmt.Println("Ledger API Server starting on http://localhost:8081")
