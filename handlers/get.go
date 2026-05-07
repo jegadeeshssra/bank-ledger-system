@@ -90,20 +90,28 @@ func (s *Server) Reconcile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetTransaction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	idStr := r.PathValue("id")
-	id, err := uuid.Parse(idStr)
+	accountID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
+		return
+	}
+
+	trxStr := r.PathValue("transaction-id")
+	trxID, err := uuid.Parse(trxStr)
 	if err != nil {
 		http.Error(w, "Invalid transaction id", http.StatusBadRequest)
 		return
 	}
 
-	entries, err := s.entryRepo.GetEntriesByTransactionID(id)
+	entries, err := s.entryRepo.GetEntriesByTransactionAndAccountID(trxID, accountID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if len(entries) == 0 {
-		http.Error(w, "Transaction not found", http.StatusNotFound)
+		http.Error(w, "Transaction not found or does not belong to this account", http.StatusNotFound)
 		return
 	}
+
 	json.NewEncoder(w).Encode(entries)
 }

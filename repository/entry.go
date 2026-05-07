@@ -110,3 +110,26 @@ func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]
 	}
 	return entries, nil
 }
+
+func (r *EntryRepository) GetEntriesByTransactionAndAccountID(transactionID, accountID uuid.UUID) ([]Entry, error) {
+	query := `SELECT id, account_id, debit, credit, transaction_id, operation_type, description, created_at 
+	          FROM entries WHERE transaction_id = $1 AND account_id = $2`
+	rows, err := r.DB.Query(query, transactionID, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("error querying entries: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []Entry
+	for rows.Next() {
+		var entry Entry
+		if err := rows.Scan(
+			&entry.ID, &entry.AccountID, &entry.Debit, &entry.Credit,
+			&entry.TransactionID, &entry.OperationType, &entry.Description, &entry.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("error scanning entry: %w", err)
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}

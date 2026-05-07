@@ -157,11 +157,24 @@ type TransferReq struct {
 
 func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	idStr := r.PathValue("id")
+	fromAccountID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid account id", http.StatusBadRequest)
+		return
+	}
+
 	var reqBody TransferReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
+
+	if reqBody.FromAccountID != uuid.Nil && reqBody.FromAccountID != fromAccountID {
+		http.Error(w, "Mismatch between URL account ID and body from_account_id", http.StatusBadRequest)
+		return
+	}
+	reqBody.FromAccountID = fromAccountID
 
 	tx, err := s.db.Begin()
 	if err != nil {
