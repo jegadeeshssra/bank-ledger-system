@@ -39,7 +39,7 @@ func formatValidationErrors(errs validator.ValidationErrors) string {
 			errMsg += fmt.Sprintf("%s must have length of %s", field, err.Param())
 		case "numeric":
 			errMsg += fmt.Sprintf("%s must be a valid numeric value", field)
-		case "gtfield":
+		case "gt":
 			errMsg += fmt.Sprintf("%s must be greater than 0", field)
 		case "nefield":
 			errMsg += fmt.Sprintf("%s cannot be equal to %s", field, err.Param())

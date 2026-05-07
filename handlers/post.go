@@ -48,7 +48,7 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 type AmountReq struct {
-	Amount string `json:"amount" validate:"required,numeric,gtfield=0"`
+	Amount string `json:"amount" validate:"required,numeric,gt=0"`
 }
 
 func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
@@ -177,8 +177,8 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 type TransferReq struct {
 	FromAccountID uuid.UUID `json:"from_account_id" validate:"required"`
-	ToAccountID   uuid.UUID `json:"to_account_id" validate:"required,nefield=FromAccountID"`
-	Amount        string    `json:"amount" validate:"required,numeric,gtfield=0"`
+	ToAccountID   uuid.UUID `json:"to_account_id" validate:"required"`
+	Amount        string    `json:"amount" validate:"required,numeric,gt=0"`
 }
 
 func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +205,11 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Mismatch between URL account ID and body from_account_id", http.StatusBadRequest)
 		return
 	}
+	if reqBody.FromAccountID == reqBody.ToAccountID {
+		http.Error(w, "from and to account cannot be same", http.StatusBadRequest)
+		return
+	}
+
 	reqBody.FromAccountID = fromAccountID
 
 	tx, err := s.db.Begin()
