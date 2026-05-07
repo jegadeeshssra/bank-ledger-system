@@ -45,7 +45,7 @@ func main() {
 	http.HandleFunc("GET /accounts/{id}/entries", srv.GetEntries)
 	http.HandleFunc("GET /accounts/{id}/reconcile", srv.Reconcile)
 	http.HandleFunc("POST /accounts/{id}/transfers", srv.Transfer)
-	http.HandleFunc("GET /accounts/{id}/transactions/{transaction-id}", srv.GetTransaction)
+	http.HandleFunc("GET /accounts/{id}/transactions/{transaction_id}", srv.GetTransaction)
 
 	// 5. Start the server on 8081 (since 8080 is used by playing-with-DB)
 	fmt.Println("Ledger API Server starting on http://localhost:8081")

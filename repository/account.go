@@ -117,6 +117,17 @@ func (r *AccountRepository) UpdateBalance(tx *sql.Tx, accountID uuid.UUID, amoun
 	return nil
 }
 
+func (r *AccountRepository) GetBalance(accountID uuid.UUID) (string, error) {
+	// Let's compute credits - debits
+	query := `SELECT balance FROM entries WHERE account_id = $1`
+	var balance string
+	err := r.DB.QueryRow(query, accountID).Scan(&balance)
+	if err != nil {
+		return "0.00", err
+	}
+	return balance, nil
+}
+
 func (r *AccountRepository) CalculateBalance(accountID uuid.UUID) (string, error) {
 	// Let's compute credits - debits
 	query := `SELECT COALESCE(SUM(credit - debit), 0) FROM entries WHERE account_id = $1`

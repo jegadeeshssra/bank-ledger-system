@@ -96,7 +96,7 @@ func (s *Server) GetTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trxStr := r.PathValue("transaction-id")
+	trxStr := r.PathValue("transaction_id")
 	trxID, err := uuid.Parse(trxStr)
 	if err != nil {
 		http.Error(w, "Invalid transaction id", http.StatusBadRequest)

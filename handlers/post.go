@@ -10,8 +10,8 @@ import (
 )
 
 type CreateAccountReq struct {
-	Name     string `json:"name"`
-	Currency string `json:"currency"`
+	Name     string `json:"name" validate:"required,min=1,max=100"`
+	Currency string `json:"currency" validate:"required,len=3"`
 	IsSystem bool   `json:"is_system"`
 }
 
@@ -21,6 +21,11 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var reqBody CreateAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate request body
+	if err := ValidateRequest(w, reqBody); err != nil {
 		return
 	}
 
@@ -43,7 +48,7 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 type AmountReq struct {
-	Amount string `json:"amount"`
+	Amount string `json:"amount" validate:"required,numeric,gtfield=0"`
 }
 
 func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +63,11 @@ func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 	var reqBody AmountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Validate request body
+	if err := ValidateRequest(w, reqBody); err != nil {
 		return
 	}
 
@@ -112,12 +122,28 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate request body
+	if err := ValidateRequest(w, reqBody); err != nil {
+		return
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback()
+
+	var sufficient bool
+	err = tx.QueryRow("SELECT balance >= CAST($1 AS NUMERIC) FROM accounts WHERE id = $2 FOR UPDATE", reqBody.Amount, accountID).Scan(&sufficient)
+	if err != nil {
+		http.Error(w, "Failed to retrieve account or invalid amount", http.StatusBadRequest)
+		return
+	}
+	if !sufficient {
+		http.Error(w, "Insufficient funds", http.StatusBadRequest)
+		return
+	}
 
 	trxID := uuid.New()
 	entry := &repository.Entry{
@@ -150,9 +176,9 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 }
 
 type TransferReq struct {
-	FromAccountID uuid.UUID `json:"from_account_id"`
-	ToAccountID   uuid.UUID `json:"to_account_id"`
-	Amount        string    `json:"amount"`
+	FromAccountID uuid.UUID `json:"from_account_id" validate:"required"`
+	ToAccountID   uuid.UUID `json:"to_account_id" validate:"required,nefield=FromAccountID"`
+	Amount        string    `json:"amount" validate:"required,numeric,gtfield=0"`
 }
 
 func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +196,11 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate request body
+	if err := ValidateRequest(w, reqBody); err != nil {
+		return
+	}
+
 	if reqBody.FromAccountID != uuid.Nil && reqBody.FromAccountID != fromAccountID {
 		http.Error(w, "Mismatch between URL account ID and body from_account_id", http.StatusBadRequest)
 		return
@@ -182,6 +213,17 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+
+	var sufficient bool
+	err = tx.QueryRow("SELECT balance >= CAST($1 AS NUMERIC) FROM accounts WHERE id = $2 FOR UPDATE", reqBody.Amount, reqBody.FromAccountID).Scan(&sufficient)
+	if err != nil {
+		http.Error(w, "Failed to retrieve account or invalid amount", http.StatusBadRequest)
+		return
+	}
+	if !sufficient {
+		http.Error(w, "Insufficient funds", http.StatusBadRequest)
+		return
+	}
 
 	trxID := uuid.New()
 
