@@ -22,6 +22,7 @@ func (r *UserRepository) CreateTable() error {
 		id UUID PRIMARY KEY,
 		username TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL,
+		salt TEXT NOT NULL,
 		created_at TIMESTAMP NOT NULL DEFAULT NOW()
 	);`
 	_, err := r.DB.Exec(query)
@@ -32,9 +33,11 @@ func (r *UserRepository) CreateTable() error {
 }
 
 func (r *UserRepository) CreateUser(user *models.User) error {
-	passwordHash := utils.HashPassword(user.Password)
-	query := `INSERT INTO users (id, username, password_hash, created_at) VALUES ($1, $2, $3, $4)`
-	_, err := r.DB.Exec(query, user.ID, user.Username, passwordHash, user.CreatedAt)
+	salt := utils.GenerateSalt()
+	passwordHash := utils.HashPasswordWithSalt(user.Password, salt)
+	user.Salt = salt
+	query := `INSERT INTO users (id, username, password_hash, salt, created_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.DB.Exec(query, user.ID, user.Username, passwordHash, salt, user.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("error inserting user: %w", err)
 	}
@@ -42,10 +45,10 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 }
 
 func (r *UserRepository) GetUserByUsername(username string) (*models.User, error) {
-	query := `SELECT id, username, password_hash, created_at FROM users WHERE username = $1`
+	query := `SELECT id, username, password_hash, salt, created_at FROM users WHERE username = $1`
 	var user models.User
 	var passwordHash string
-	err := r.DB.QueryRow(query, username).Scan(&user.ID, &user.Username, &passwordHash, &user.CreatedAt)
+	err := r.DB.QueryRow(query, username).Scan(&user.ID, &user.Username, &passwordHash, &user.Salt, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -64,7 +67,7 @@ func (r *UserRepository) VerifyPassword(username, password string) (*models.User
 	if user == nil {
 		return nil, nil
 	}
-	if !utils.CheckPassword(password, user.Password) {
+	if !utils.CheckPasswordWithSalt(password, user.Password, user.Salt) {
 		return nil, nil
 	}
 	user.Password = "xxxxxxxxxxxx" // Clear password hash

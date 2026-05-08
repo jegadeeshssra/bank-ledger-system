@@ -22,7 +22,7 @@ type TransferReq struct {
 
 type RegisterRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
-	Password string `json:"password" validate:"required,min=6"`
+	Password string `json:"password" validate:"required,min=12"`
 }
 
 type LoginRequest struct {
