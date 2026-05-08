@@ -52,7 +52,7 @@ func main() {
 	http.HandleFunc("GET /accounts/{id}/entries", srv.GetEntries)
 	http.HandleFunc("GET /accounts/{id}/reconcile", srv.Reconcile)
 
-	http.HandleFunc("POST /accounts", srv.CreateAccount)
+	http.HandleFunc("POST /accounts", handlers.JWTMiddleware(srv.CreateAccount))
 	http.HandleFunc("POST /accounts/{id}/deposit", srv.Deposit)
 	http.HandleFunc("POST /accounts/{id}/withdraw", srv.Withdraw)
 	http.HandleFunc("POST /accounts/{id}/transfers", srv.Transfer)

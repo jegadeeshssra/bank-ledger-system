@@ -7,6 +7,7 @@ import (
 
 	"ledger-system/models"
 	"ledger-system/repository"
+	"ledger-system/utils"
 
 	"github.com/google/uuid"
 )
@@ -84,10 +85,20 @@ func (a *AuthServer) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For simplicity, return user ID. In production, use JWT or session.
-	response := map[string]interface{}{
-		"user_id": user.ID,
-		"message": "Login successful",
+	// Generate JWT token
+	token, err := utils.GenerateJWT(user.ID)
+	if err != nil {
+		http.Error(w, "Error generating authentication token", http.StatusInternalServerError)
+		return
 	}
+
+	response := map[string]interface{}{
+		"token":      token,
+		"user_id":    user.ID,
+		"username":   user.Username,
+		"message":    "Login successful",
+		"expires_in": "24h",
+	}
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }

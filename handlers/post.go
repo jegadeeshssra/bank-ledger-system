@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,9 +14,16 @@ import (
 func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Get user ID from JWT context
+	userID, ok := GetUserIDFromContext(r)
+	if !ok {
+		http.Error(w, `{"error": "Unauthorized - valid JWT token required"}`, http.StatusUnauthorized)
+		return
+	}
+
 	var reqBody models.CreateAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		http.Error(w, `{"error": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -26,7 +34,7 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc := &models.Account{
 		ID:        uuid.New(),
-		UserID:    uuid.NullUUID{Valid: false}, // No user assigned yet
+		UserID:    uuid.NullUUID{UUID: userID, Valid: true}, // Assign authenticated user ID
 		Name:      reqBody.Name,
 		Balance:   "0.00",
 		Currency:  reqBody.Currency,
@@ -36,7 +44,7 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	err := s.accRepo.CreateAccount(acc)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
 
