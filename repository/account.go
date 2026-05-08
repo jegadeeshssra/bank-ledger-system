@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +15,7 @@ type Account struct {
 	Balance   string        `json:"balance" validate:"required,numeric"`
 	Currency  string        `json:"currency" validate:"required"`
 	IsSystem  bool          `json:"is_system"`
-	CreatedAt sql.NullTime  `json:"created_at"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 type AccountRepository struct {
@@ -34,7 +35,7 @@ func (r *AccountRepository) CreateTable() error {
 		balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
 		currency TEXT NOT NULL,
 		is_system BOOLEAN NOT NULL DEFAULT false,
-		created_at TIMESTAMP DEFAULT now()
+		created_at TIMESTAMP NOT NULL DEFAULT NOW()
 	);`
 	_, err := r.DB.Exec(query)
 	if err != nil {
@@ -64,7 +65,6 @@ func (r *AccountRepository) GetAccount(id uuid.UUID) (*Account, error) {
 		}
 		return nil, fmt.Errorf("error fetching account: %w", err)
 	}
-	acc.Currency = ""
 	return &acc, nil
 }
 

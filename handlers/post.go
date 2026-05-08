@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"ledger-system/repository"
 
@@ -30,11 +31,12 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	acc := &repository.Account{
-		ID:       uuid.New(),
-		Name:     reqBody.Name,
-		Balance:  "0.00",
-		Currency: reqBody.Currency,
-		IsSystem: reqBody.IsSystem,
+		ID:        uuid.New(),
+		Name:      reqBody.Name,
+		Balance:   "0.00",
+		Currency:  reqBody.Currency,
+		IsSystem:  reqBody.IsSystem,
+		CreatedAt: time.Now(),
 	}
 
 	err := s.accRepo.CreateAccount(acc)
@@ -89,6 +91,7 @@ func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 		Debit:         "0.00",
 		TransactionID: trxID,
 		OperationType: "DEPOSIT",
+		CreatedAt:     time.Now(),
 	}
 
 	if err := s.entryRepo.InsertEntry(tx, entry); err != nil {

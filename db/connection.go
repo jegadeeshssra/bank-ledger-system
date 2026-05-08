@@ -8,7 +8,7 @@ import (
 )
 
 func Connect() (*sql.DB, error) {
-	connStr := "user=postgres password=postgres dbname=bankdb sslmode=disable"
+	connStr := "user=postgres password=postgres dbname=bankledger sslmode=disable"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database connection: %w", err)

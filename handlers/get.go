@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"reflect"
 
 	"ledger-system/repository"
 
@@ -29,7 +27,7 @@ func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
-	fmt.Println(reflect.TypeOf(acc))
+	//fmt.Println(reflect.TypeOf(acc))
 	if err := ValidateResponse(w, acc); err != nil {
 		return
 	}

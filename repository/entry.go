@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +16,7 @@ type Entry struct {
 	TransactionID uuid.UUID      `json:"transaction_id" validate:"required"`
 	OperationType string         `json:"operation_type" validate:"required"`
 	Description   sql.NullString `json:"description"`
-	CreatedAt     sql.NullTime   `json:"created_at"`
+	CreatedAt     time.Time      `json:"created_at"`
 }
 
 type EntryRepository struct {
@@ -36,7 +37,7 @@ func (r *EntryRepository) CreateTable() error {
 		transaction_id UUID NOT NULL,
 		operation_type TEXT NOT NULL,
 		description TEXT,
-		created_at TIMESTAMP DEFAULT now(),
+		created_at TIMESTAMP NOT NULL DEFAULT now(),
 		CONSTRAINT fk_account
 			FOREIGN KEY(account_id) 
 			REFERENCES accounts(id)
