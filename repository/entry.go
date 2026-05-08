@@ -3,21 +3,11 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"time"
+
+	"ledger-system/models"
 
 	"github.com/google/uuid"
 )
-
-type Entry struct {
-	ID            uuid.UUID      `json:"id" validate:"required"`
-	AccountID     uuid.UUID      `json:"account_id" validate:"required"`
-	Debit         string         `json:"debit" validate:"required,numeric"`
-	Credit        string         `json:"credit" validate:"required,numeric"`
-	TransactionID uuid.UUID      `json:"transaction_id" validate:"required"`
-	OperationType string         `json:"operation_type" validate:"required"`
-	Description   sql.NullString `json:"description"`
-	CreatedAt     time.Time      `json:"created_at"`
-}
 
 type EntryRepository struct {
 	DB *sql.DB
@@ -32,6 +22,7 @@ func (r *EntryRepository) CreateTable() error {
 	CREATE TABLE IF NOT EXISTS entries (
 		id UUID PRIMARY KEY,
 		account_id UUID NOT NULL,
+		user_id UUID NOT NULL,
 		debit DECIMAL(15,2) NOT NULL DEFAULT 0.00,
 		credit DECIMAL(15,2) NOT NULL DEFAULT 0.00,
 		transaction_id UUID NOT NULL,
@@ -49,12 +40,12 @@ func (r *EntryRepository) CreateTable() error {
 	return nil
 }
 
-func (r *EntryRepository) InsertEntry(tx *sql.Tx, entry *Entry) error {
-	query := `INSERT INTO entries (id, account_id, debit, credit, transaction_id, operation_type, description, created_at) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+func (r *EntryRepository) InsertEntry(tx *sql.Tx, entry *models.Entry) error {
+	query := `INSERT INTO entries (id, account_id, user_id, debit, credit, transaction_id, operation_type, description, created_at) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 	var err error
 	if tx != nil {
-		_, err = tx.Exec(query, entry.ID, entry.AccountID, entry.Debit, entry.Credit, entry.TransactionID, entry.OperationType, entry.Description, entry.CreatedAt)
+		_, err = tx.Exec(query, entry.ID, entry.AccountID, entry.UserID, entry.Debit, entry.Credit, entry.TransactionID, entry.OperationType, entry.Description, entry.CreatedAt)
 	}
 	if err != nil {
 		return fmt.Errorf("error inserting entry: %w", err)
@@ -62,8 +53,8 @@ func (r *EntryRepository) InsertEntry(tx *sql.Tx, entry *Entry) error {
 	return nil
 }
 
-func (r *EntryRepository) GetEntriesByAccountID(accountID uuid.UUID) ([]Entry, error) {
-	query := `SELECT id, account_id, debit, credit, transaction_id, operation_type, description, created_at 
+func (r *EntryRepository) GetEntriesByAccountID(accountID uuid.UUID) ([]models.Entry, error) {
+	query := `SELECT id, account_id, user_id, debit, credit, transaction_id, operation_type, description, created_at 
 	          FROM entries WHERE account_id = $1 ORDER BY created_at ASC`
 	rows, err := r.DB.Query(query, accountID)
 	if err != nil {
@@ -71,11 +62,11 @@ func (r *EntryRepository) GetEntriesByAccountID(accountID uuid.UUID) ([]Entry, e
 	}
 	defer rows.Close()
 
-	var entries []Entry
+	var entries []models.Entry
 	for rows.Next() {
-		var entry Entry
+		var entry models.Entry
 		if err := rows.Scan(
-			&entry.ID, &entry.AccountID, &entry.Debit, &entry.Credit,
+			&entry.ID, &entry.AccountID, &entry.UserID, &entry.Debit, &entry.Credit,
 			&entry.TransactionID, &entry.OperationType, &entry.Description, &entry.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("error scanning entry: %w", err)
@@ -89,8 +80,8 @@ func (r *EntryRepository) GetEntriesByAccountID(accountID uuid.UUID) ([]Entry, e
 	return entries, nil
 }
 
-func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]Entry, error) {
-	query := `SELECT id, account_id, debit, credit, transaction_id, operation_type, description, created_at 
+func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]models.Entry, error) {
+	query := `SELECT id, account_id, user_id, debit, credit, transaction_id, operation_type, description, created_at 
 	          FROM entries WHERE transaction_id = $1`
 	rows, err := r.DB.Query(query, transactionID)
 	if err != nil {
@@ -98,11 +89,11 @@ func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]
 	}
 	defer rows.Close()
 
-	var entries []Entry
+	var entries []models.Entry
 	for rows.Next() {
-		var entry Entry
+		var entry models.Entry
 		if err := rows.Scan(
-			&entry.ID, &entry.AccountID, &entry.Debit, &entry.Credit,
+			&entry.ID, &entry.AccountID, &entry.UserID, &entry.Debit, &entry.Credit,
 			&entry.TransactionID, &entry.OperationType, &entry.Description, &entry.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("error scanning entry: %w", err)
@@ -112,8 +103,8 @@ func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]
 	return entries, nil
 }
 
-func (r *EntryRepository) GetEntriesByTransactionAndAccountID(transactionID, accountID uuid.UUID) ([]Entry, error) {
-	query := `SELECT id, account_id, debit, credit, transaction_id, operation_type, description, created_at 
+func (r *EntryRepository) GetEntriesByTransactionAndAccountID(transactionID, accountID uuid.UUID) ([]models.Entry, error) {
+	query := `SELECT id, account_id, user_id, debit, credit, transaction_id, operation_type, description, created_at 
 	          FROM entries WHERE transaction_id = $1 AND account_id = $2`
 	rows, err := r.DB.Query(query, transactionID, accountID)
 	if err != nil {
@@ -121,11 +112,11 @@ func (r *EntryRepository) GetEntriesByTransactionAndAccountID(transactionID, acc
 	}
 	defer rows.Close()
 
-	var entries []Entry
+	var entries []models.Entry
 	for rows.Next() {
-		var entry Entry
+		var entry models.Entry
 		if err := rows.Scan(
-			&entry.ID, &entry.AccountID, &entry.Debit, &entry.Credit,
+			&entry.ID, &entry.AccountID, &entry.UserID, &entry.Debit, &entry.Credit,
 			&entry.TransactionID, &entry.OperationType, &entry.Description, &entry.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("error scanning entry: %w", err)

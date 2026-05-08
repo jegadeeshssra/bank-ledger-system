@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"reflect"
 
-	"ledger-system/repository"
+	"ledger-system/models"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -33,38 +33,38 @@ func ValidateResponse(w http.ResponseWriter, resp interface{}) error {
 	validate := validator.New()
 	fmt.Println(reflect.TypeOf(resp))
 	switch data := resp.(type) {
-	case []repository.Account:
+	case []models.Account:
 		for _, acc := range data {
 			if err := validate.Struct(acc); err != nil {
 				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
 				return err
 			}
 		}
-	case repository.Account:
+	case models.Account:
 		if err := validate.Struct(data); err != nil {
 			http.Error(w, "Invalid response payload", http.StatusInternalServerError)
 			return err
 		}
-	case *repository.Account:
+	case *models.Account:
 		if data != nil {
 			if err := validate.Struct(data); err != nil {
 				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
 				return err
 			}
 		}
-	case []repository.Entry:
+	case []models.Entry:
 		for _, entry := range data {
 			if err := validate.Struct(entry); err != nil {
 				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
 				return err
 			}
 		}
-	case repository.Entry:
+	case models.Entry:
 		if err := validate.Struct(data); err != nil {
 			http.Error(w, "Invalid response payload", http.StatusInternalServerError)
 			return err
 		}
-	case *repository.Entry:
+	case *models.Entry:
 		if data != nil {
 			if err := validate.Struct(data); err != nil {
 				http.Error(w, "Invalid response payload", http.StatusInternalServerError)

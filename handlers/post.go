@@ -5,21 +5,15 @@ import (
 	"net/http"
 	"time"
 
-	"ledger-system/repository"
+	"ledger-system/models"
 
 	"github.com/google/uuid"
 )
 
-type CreateAccountReq struct {
-	Name     string `json:"name" validate:"required,min=1,max=100"`
-	Currency string `json:"currency" validate:"required,len=3"`
-	IsSystem bool   `json:"is_system"`
-}
-
 func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var reqBody CreateAccountReq
+	var reqBody models.CreateAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -30,8 +24,9 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	acc := &repository.Account{
+	acc := &models.Account{
 		ID:        uuid.New(),
+		UserID:    uuid.NullUUID{Valid: false}, // No user assigned yet
 		Name:      reqBody.Name,
 		Balance:   "0.00",
 		Currency:  reqBody.Currency,
@@ -52,10 +47,6 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(acc)
 }
 
-type AmountReq struct {
-	Amount string `json:"amount" validate:"required,numeric,gt=0"`
-}
-
 func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	idStr := r.PathValue("id")
@@ -65,7 +56,7 @@ func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqBody AmountReq
+	var reqBody models.AmountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -84,9 +75,10 @@ func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 
 	trxID := uuid.New()
-	entry := &repository.Entry{
+	entry := &models.Entry{
 		ID:            uuid.New(),
 		AccountID:     accountID,
+		UserID:        uuid.Nil, // TODO: Get from authenticated user
 		Credit:        reqBody.Amount,
 		Debit:         "0.00",
 		TransactionID: trxID,
@@ -125,7 +117,7 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqBody AmountReq
+	var reqBody models.AmountReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -155,9 +147,10 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	trxID := uuid.New()
-	entry := &repository.Entry{
+	entry := &models.Entry{
 		ID:            uuid.New(),
 		AccountID:     accountID,
+		UserID:        uuid.Nil, // TODO: Get from authenticated user
 		Credit:        "0.00",
 		Debit:         reqBody.Amount,
 		TransactionID: trxID,
@@ -187,12 +180,6 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(entry)
 }
 
-type TransferReq struct {
-	FromAccountID uuid.UUID `json:"from_account_id" validate:"required"`
-	ToAccountID   uuid.UUID `json:"to_account_id" validate:"required"`
-	Amount        string    `json:"amount" validate:"required,numeric,gt=0"`
-}
-
 func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	idStr := r.PathValue("id")
@@ -202,7 +189,7 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqBody TransferReq
+	var reqBody models.TransferReq
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -245,9 +232,10 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 	trxID := uuid.New()
 
 	// From Account (Debit)
-	entryFrom := &repository.Entry{
+	entryFrom := &models.Entry{
 		ID:            uuid.New(),
 		AccountID:     reqBody.FromAccountID,
+		UserID:        uuid.Nil, // TODO: Get from authenticated user
 		Credit:        "0.00",
 		Debit:         reqBody.Amount,
 		TransactionID: trxID,
@@ -263,9 +251,10 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// To Account (Credit)
-	entryTo := &repository.Entry{
+	entryTo := &models.Entry{
 		ID:            uuid.New(),
 		AccountID:     reqBody.ToAccountID,
+		UserID:        uuid.Nil, // TODO: Get from authenticated user
 		Credit:        reqBody.Amount,
 		Debit:         "0.00",
 		TransactionID: trxID,

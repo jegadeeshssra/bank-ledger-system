@@ -3,20 +3,11 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"time"
+
+	"ledger-system/models"
 
 	"github.com/google/uuid"
 )
-
-type Account struct {
-	ID        uuid.UUID     `json:"id" validate:"required"`
-	OwnerID   uuid.NullUUID `json:"owner_id"`
-	Name      string        `json:"name" validate:"required"`
-	Balance   string        `json:"balance" validate:"required,numeric"`
-	Currency  string        `json:"currency" validate:"required"`
-	IsSystem  bool          `json:"is_system"`
-	CreatedAt time.Time     `json:"created_at"`
-}
 
 type AccountRepository struct {
 	DB *sql.DB
@@ -30,7 +21,7 @@ func (r *AccountRepository) CreateTable() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS accounts (
 		id UUID PRIMARY KEY,
-		owner_id UUID,
+		user_id UUID,
 		name TEXT NOT NULL,
 		balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
 		currency TEXT NOT NULL,
@@ -44,20 +35,20 @@ func (r *AccountRepository) CreateTable() error {
 	return nil
 }
 
-func (r *AccountRepository) CreateAccount(acc *Account) error {
-	query := `INSERT INTO accounts (id, owner_id, name, balance, currency, is_system, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.DB.Exec(query, acc.ID, acc.OwnerID, acc.Name, acc.Balance, acc.Currency, acc.IsSystem, acc.CreatedAt)
+func (r *AccountRepository) CreateAccount(acc *models.Account) error {
+	query := `INSERT INTO accounts (id, user_id, name, balance, currency, is_system, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	_, err := r.DB.Exec(query, acc.ID, acc.UserID, acc.Name, acc.Balance, acc.Currency, acc.IsSystem, acc.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("error inserting account: %w", err)
 	}
 	return nil
 }
 
-func (r *AccountRepository) GetAccount(id uuid.UUID) (*Account, error) {
-	query := `SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts WHERE id = $1`
-	var acc Account
+func (r *AccountRepository) GetAccount(id uuid.UUID) (*models.Account, error) {
+	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts WHERE id = $1`
+	var acc models.Account
 	err := r.DB.QueryRow(query, id).Scan(
-		&acc.ID, &acc.OwnerID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt,
+		&acc.ID, &acc.UserID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -68,18 +59,18 @@ func (r *AccountRepository) GetAccount(id uuid.UUID) (*Account, error) {
 	return &acc, nil
 }
 
-func (r *AccountRepository) ListAccounts() ([]Account, error) {
-	query := `SELECT id, owner_id, name, balance, currency, is_system, created_at FROM accounts`
+func (r *AccountRepository) ListAccounts() ([]models.Account, error) {
+	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts`
 	rows, err := r.DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying accounts: %w", err)
 	}
 	defer rows.Close()
 
-	var accounts []Account
+	var accounts []models.Account
 	for rows.Next() {
-		var acc Account
-		if err := rows.Scan(&acc.ID, &acc.OwnerID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt); err != nil {
+		var acc models.Account
+		if err := rows.Scan(&acc.ID, &acc.UserID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning account: %w", err)
 		}
 		accounts = append(accounts, acc)

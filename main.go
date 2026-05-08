@@ -22,6 +22,7 @@ func main() {
 	// 2. Initialize the Account & Entry repositories
 	accRepo := repository.NewAccountRepository(database)
 	entryRepo := repository.NewEntryRepository(database)
+	userRepo := repository.NewUserRepository(database)
 
 	// 3. Create the tables if they don't exist
 	err = accRepo.CreateTable()
@@ -32,22 +33,29 @@ func main() {
 	if err != nil {
 		log.Fatal("Error creating entries table:", err)
 	}
+	err = userRepo.CreateTable()
+	if err != nil {
+		log.Fatal("Error creating users table:", err)
+	}
 
 	// 4. Initialize HTTP Server Handlers
-	srv := handlers.NewServer(accRepo, entryRepo, database)
+	srv := handlers.NewServer(accRepo, entryRepo, userRepo, database)
+	authSrv := handlers.NewAuthServer(userRepo)
 
 	// Use Go 1.22+ clean method-based routing
-	http.HandleFunc("GET /accounts", srv.ListAccounts)
-	http.HandleFunc("POST /accounts", srv.CreateAccount)
-	http.HandleFunc("GET /accounts/{id}", srv.GetAccount)
+	http.HandleFunc("POST /register", authSrv.Register)
+	http.HandleFunc("POST /login", authSrv.Login)
 
+	http.HandleFunc("GET /accounts", srv.ListAccounts)
+	http.HandleFunc("GET /accounts/{id}", srv.GetAccount)
+	http.HandleFunc("GET /accounts/{id}/transactions/{transaction_id}", srv.GetTransaction)
+	http.HandleFunc("GET /accounts/{id}/entries", srv.GetEntries)
+	http.HandleFunc("GET /accounts/{id}/reconcile", srv.Reconcile)
+
+	http.HandleFunc("POST /accounts", srv.CreateAccount)
 	http.HandleFunc("POST /accounts/{id}/deposit", srv.Deposit)
 	http.HandleFunc("POST /accounts/{id}/withdraw", srv.Withdraw)
 	http.HandleFunc("POST /accounts/{id}/transfers", srv.Transfer)
-	http.HandleFunc("GET /accounts/{id}/transactions/{transaction_id}", srv.GetTransaction)
-
-	http.HandleFunc("GET /accounts/{id}/entries", srv.GetEntries)
-	http.HandleFunc("GET /accounts/{id}/reconcile", srv.Reconcile)
 
 	http.HandleFunc("DELETE /accounts/{id}", srv.DeleteAccount)
 

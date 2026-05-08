@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"ledger-system/repository"
+	"ledger-system/models"
 
 	"github.com/google/uuid"
 )
@@ -42,7 +42,7 @@ func (s *Server) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if accounts == nil {
-		accounts = []repository.Account{}
+		accounts = []models.Account{}
 	}
 	if err := ValidateResponse(w, accounts); err != nil {
 		return
@@ -65,7 +65,7 @@ func (s *Server) GetEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if entries == nil {
-		entries = []repository.Entry{}
+		entries = []models.Entry{}
 	}
 	if err := ValidateResponse(w, entries); err != nil {
 		return
