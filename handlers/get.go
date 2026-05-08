@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"reflect"
 
 	"ledger-system/repository"
 
@@ -27,6 +29,10 @@ func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
+	fmt.Println(reflect.TypeOf(acc))
+	if err := ValidateResponse(w, acc); err != nil {
+		return
+	}
 	json.NewEncoder(w).Encode(acc)
 }
 
@@ -39,6 +45,9 @@ func (s *Server) ListAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	if accounts == nil {
 		accounts = []repository.Account{}
+	}
+	if err := ValidateResponse(w, accounts); err != nil {
+		return
 	}
 	json.NewEncoder(w).Encode(accounts)
 }
@@ -59,6 +68,9 @@ func (s *Server) GetEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	if entries == nil {
 		entries = []repository.Entry{}
+	}
+	if err := ValidateResponse(w, entries); err != nil {
+		return
 	}
 	json.NewEncoder(w).Encode(entries)
 }
@@ -110,6 +122,9 @@ func (s *Server) GetTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(entries) == 0 {
 		http.Error(w, "Transaction not found or does not belong to this account", http.StatusNotFound)
+		return
+	}
+	if err := ValidateResponse(w, entries); err != nil {
 		return
 	}
 

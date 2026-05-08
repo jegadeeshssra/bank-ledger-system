@@ -3,9 +3,18 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"reflect"
+
+	"ledger-system/repository"
 
 	"github.com/go-playground/validator/v10"
 )
+
+// interface{} =
+// {
+//     type: repository.Account,
+//     value: {...}
+// }
 
 // ValidateRequest validates a struct and writes appropriate error response
 func ValidateRequest(w http.ResponseWriter, req interface{}) error {
@@ -16,6 +25,60 @@ func ValidateRequest(w http.ResponseWriter, req interface{}) error {
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return err
 	}
+	return nil
+}
+
+// ValidateResponse validates outbound response payloads and writes an error if invalid.
+func ValidateResponse(w http.ResponseWriter, resp interface{}) error {
+	validate := validator.New()
+	fmt.Println(reflect.TypeOf(resp))
+	switch data := resp.(type) {
+	case []repository.Account:
+		for _, acc := range data {
+			if err := validate.Struct(acc); err != nil {
+				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+				return err
+			}
+		}
+	case repository.Account:
+		if err := validate.Struct(data); err != nil {
+			http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+			return err
+		}
+	case *repository.Account:
+		if data != nil {
+			if err := validate.Struct(data); err != nil {
+				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+				return err
+			}
+		}
+	case []repository.Entry:
+		for _, entry := range data {
+			if err := validate.Struct(entry); err != nil {
+				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+				return err
+			}
+		}
+	case repository.Entry:
+		if err := validate.Struct(data); err != nil {
+			http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+			return err
+		}
+	case *repository.Entry:
+		if data != nil {
+			if err := validate.Struct(data); err != nil {
+				http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+				return err
+			}
+		}
+	default:
+		if err := validate.Struct(data); err != nil {
+			http.Error(w, "Invalid response payload", http.StatusInternalServerError)
+			return err
+		}
+
+	}
+
 	return nil
 }
 

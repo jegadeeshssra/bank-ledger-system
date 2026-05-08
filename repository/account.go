@@ -8,11 +8,11 @@ import (
 )
 
 type Account struct {
-	ID        uuid.UUID     `json:"id"`
+	ID        uuid.UUID     `json:"id" validate:"required"`
 	OwnerID   uuid.NullUUID `json:"owner_id"`
-	Name      string        `json:"name"`
-	Balance   string        `json:"balance"`
-	Currency  string        `json:"currency"`
+	Name      string        `json:"name" validate:"required"`
+	Balance   string        `json:"balance" validate:"required,numeric"`
+	Currency  string        `json:"currency" validate:"required"`
 	IsSystem  bool          `json:"is_system"`
 	CreatedAt sql.NullTime  `json:"created_at"`
 }
@@ -64,6 +64,7 @@ func (r *AccountRepository) GetAccount(id uuid.UUID) (*Account, error) {
 		}
 		return nil, fmt.Errorf("error fetching account: %w", err)
 	}
+	acc.Currency = ""
 	return &acc, nil
 }
 

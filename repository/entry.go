@@ -8,12 +8,12 @@ import (
 )
 
 type Entry struct {
-	ID            uuid.UUID      `json:"id"`
-	AccountID     uuid.UUID      `json:"account_id"`
-	Debit         string         `json:"debit"`
-	Credit        string         `json:"credit"`
-	TransactionID uuid.UUID      `json:"transaction_id"`
-	OperationType string         `json:"operation_type"`
+	ID            uuid.UUID      `json:"id" validate:"required"`
+	AccountID     uuid.UUID      `json:"account_id" validate:"required"`
+	Debit         string         `json:"debit" validate:"required,numeric"`
+	Credit        string         `json:"credit" validate:"required,numeric"`
+	TransactionID uuid.UUID      `json:"transaction_id" validate:"required"`
+	OperationType string         `json:"operation_type" validate:"required"`
 	Description   sql.NullString `json:"description"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
 }

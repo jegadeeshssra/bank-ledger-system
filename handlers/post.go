@@ -43,6 +43,9 @@ func (s *Server) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := ValidateResponse(w, acc); err != nil {
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(acc)
 }
@@ -103,6 +106,9 @@ func (s *Server) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := ValidateResponse(w, entry); err != nil {
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(entry)
 }
@@ -171,6 +177,9 @@ func (s *Server) Withdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := ValidateResponse(w, entry); err != nil {
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(entry)
 }
