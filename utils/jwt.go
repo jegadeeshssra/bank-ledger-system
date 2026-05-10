@@ -22,9 +22,9 @@ func init() {
 	jwtSecret = []byte(secret)
 }
 
-type JWTClaims struct {
-	UserID uuid.UUID `json:"user_id"`
-	jwt.RegisteredClaims
+type CustomJWTClaims struct {
+	UserID               uuid.UUID `json:"user_id"`
+	jwt.RegisteredClaims           // this will substitue the RegisteredClaims
 }
 
 // GenerateJWT generates a JWT token with user ID as subject
@@ -32,7 +32,13 @@ func GenerateJWT(userID uuid.UUID) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(24 * time.Hour) // Token expires in 24 hours
 
-	claims := &JWTClaims{
+	// // Create RegisteredClaims
+	// claims := &jwt.RegisteredClaims{
+	// 	ExpiresAt: jwt.NewNumericDate(time.Unix(1516239022, 0)),
+	// 	Issuer:    "test",
+	// }
+
+	claims := &CustomJWTClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(), // Use user ID as subject
@@ -54,7 +60,7 @@ func GenerateJWT(userID uuid.UUID) (string, error) {
 
 // ValidateJWT validates the JWT token and returns the user ID
 func ValidateJWT(tokenString string) (uuid.UUID, error) {
-	claims := &JWTClaims{}
+	claims := &CustomJWTClaims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		// Validate the signing method

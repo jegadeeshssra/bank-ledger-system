@@ -93,11 +93,11 @@ func (a *AuthServer) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"token":      token,
-		"user_id":    user.ID,
-		"username":   user.Username,
-		"message":    "Login successful",
-		"expires_in": "24h",
+		"access_token": token,
+		"user_id":      user.ID,
+		"username":     user.Username,
+		"message":      "Login successful",
+		"expires_in":   "24h",
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)

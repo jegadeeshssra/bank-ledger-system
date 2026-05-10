@@ -44,6 +44,7 @@ func (r *AccountRepository) CreateAccount(acc *models.Account) error {
 	return nil
 }
 
+// Used to display the list of accounts using Userid
 func (r *AccountRepository) GetAccount(id uuid.UUID) (*models.Account, error) {
 	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts WHERE id = $1`
 	var acc models.Account
@@ -59,9 +60,47 @@ func (r *AccountRepository) GetAccount(id uuid.UUID) (*models.Account, error) {
 	return &acc, nil
 }
 
+func (r *AccountRepository) GetAccountByUserID(accountID, userID uuid.UUID) (*models.Account, error) {
+	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts WHERE id = $1 AND user_id = $2`
+	var acc models.Account
+	err := r.DB.QueryRow(query, accountID, userID).Scan(
+		&acc.ID, &acc.UserID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Return nil if no record is found
+		}
+		return nil, fmt.Errorf("error fetching account: %w", err)
+	}
+	return &acc, nil
+}
+
 func (r *AccountRepository) ListAccounts() ([]models.Account, error) {
 	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts`
 	rows, err := r.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []models.Account
+	for rows.Next() {
+		var acc models.Account
+		if err := rows.Scan(&acc.ID, &acc.UserID, &acc.Name, &acc.Balance, &acc.Currency, &acc.IsSystem, &acc.CreatedAt); err != nil {
+			return nil, fmt.Errorf("error scanning account: %w", err)
+		}
+		accounts = append(accounts, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating accounts: %w", err)
+	}
+	return accounts, nil
+}
+
+func (r *AccountRepository) ListAccountsByUserID(userID uuid.UUID) ([]models.Account, error) {
+	query := `SELECT id, user_id, name, balance, currency, is_system, created_at FROM accounts WHERE user_id = $1`
+	rows, err := r.DB.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying accounts: %w", err)
 	}
