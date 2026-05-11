@@ -45,7 +45,7 @@ func main() {
 
 	// Use Go 1.22+ clean method-based routing
 	http.HandleFunc("POST /register", authSrv.Register)
-	http.HandleFunc("POST /login", authSrv.Login)
+	http.HandleFunc("POST /login", middleware.RateLimitMiddleware(authSrv.Login))
 
 	http.HandleFunc("GET /accounts", middleware.JWTMiddleware(srv.ListAccounts))
 	http.HandleFunc("GET /accounts/{id}", middleware.JWTMiddleware(srv.GetAccount))

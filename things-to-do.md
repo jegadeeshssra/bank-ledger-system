@@ -1,6 +1,4 @@
-- login and register
-- jwt token
-- rate limiting
+- token bucket rate limiting
 - swagger docs
 
-- should creat indexes for accountids
+- should create indexes for accountids   
