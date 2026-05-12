@@ -1,4 +1,4 @@
 - token bucket rate limiting
 - swagger docs
-
 - should create indexes for accountids   
+- access creds and dynamic values through env variabless

@@ -26,6 +26,14 @@ type ipRateLimiter struct {
 	window      time.Duration
 }
 
+type globalRateLimiter struct {
+	mu          sync.Mutex
+	count       int
+	first       time.Time
+	maxRequests int
+	window      time.Duration
+}
+
 func newIPRateLimiter(maxAttempts int, window time.Duration) *ipRateLimiter {
 	return &ipRateLimiter{
 		requests:    make(map[string]*loginAttempt),
@@ -34,7 +42,14 @@ func newIPRateLimiter(maxAttempts int, window time.Duration) *ipRateLimiter {
 	}
 }
 
-// Limits the request rate based on the src ip for a fixed windows
+func newGlobalRateLimiter(maxRequests int, window time.Duration) *globalRateLimiter {
+	return &globalRateLimiter{
+		maxRequests: maxRequests,
+		window:      window,
+	}
+}
+
+// Limits the request rate based on the src ip for a fixed window.
 func (l *ipRateLimiter) Allow(ip string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -51,6 +66,26 @@ func (l *ipRateLimiter) Allow(ip string) bool {
 	}
 
 	attempt.count++
+	return true
+}
+
+func (l *globalRateLimiter) Allow() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := time.Now()
+	// It checks whether the time.Time has never been set (or was explicitly set to zero).
+	if l.first.IsZero() || now.Sub(l.first) > l.window {
+		l.count = 1
+		l.first = now
+		return true
+	}
+
+	if l.count >= l.maxRequests {
+		return false
+	}
+
+	l.count++
 	return true
 }
 
@@ -76,6 +111,7 @@ func getClientIP(r *http.Request) string {
 }
 
 var LoginRateLimiter = newIPRateLimiter(5, 5*time.Minute)
+var GlobalLoginRateLimiter = newGlobalRateLimiter(20, 5*time.Minute)
 
 // JWTMiddleware validates JWT tokens and adds user ID to request context
 func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -115,13 +151,20 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // RateLimitMiddleware limits the number of requests per IP for login attempts
+// and also enforces a global limit of 20 login requests per 5 minute window.
 func RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		clientIP := getClientIP(r)
 		if !LoginRateLimiter.Allow(clientIP) {
-			http.Error(w, "Too many login attempts. Please try again in 5 minutes.", http.StatusTooManyRequests)
+			http.Error(w, "Too many login attempts from this IP. Please try again in 5 minutes.", http.StatusTooManyRequests)
 			return
 		}
+
+		if !GlobalLoginRateLimiter.Allow() {
+			http.Error(w, "Too many login attempts globally. Please try again in 5 minutes.", http.StatusTooManyRequests)
+			return
+		}
+
 		next(w, r)
 	}
 }
