@@ -2,24 +2,27 @@ package utils
 
 import (
 	"fmt"
-	"os"
 	"time"
+
+	"ledger-system/config"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
 var jwtSecret []byte
+var jwtIssuer string
+var jwtExpiry time.Duration
 
 func init() {
-	secret := os.Getenv("JWT_SECRET")
+	secret := config.GetString("JWT_SECRET", "")
 	if secret == "" {
-		// In production, this should fail or use a secure default
-		// For development, we'll use a default but log a warning
 		fmt.Println("WARNING: JWT_SECRET environment variable not set. Using default secret for development.")
 		secret = "your-development-secret-key-change-in-production"
 	}
 	jwtSecret = []byte(secret)
+	jwtIssuer = config.GetString("JWT_ISSUER", "ledger-system")
+	jwtExpiry = config.GetDuration("JWT_EXPIRY_DURATION", 5*time.Minute)
 }
 
 type CustomJWTClaims struct {
@@ -45,7 +48,7 @@ func GenerateJWT(userID uuid.UUID) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "ledger-system",
+			Issuer:    jwtIssuer,
 		},
 	}
 

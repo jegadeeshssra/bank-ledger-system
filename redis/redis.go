@@ -4,58 +4,57 @@ package redisstore
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 	"strings"
 	"time"
+
+	"ledger-system/config"
 
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	// LoginCapacity is the maximum number of login requests allowed within the token bucket.
-	LoginCapacity = 3
+	defaultLoginCapacity = 3
+	defaultLoginWindow   = 5 * time.Minute
 
-	// LoginWindow is the base time window used for both the login throttling period and
-	// token bucket expiration.
-	LoginWindow = 5 * time.Minute
-
-	// LoginRefillRate is the number of login tokens added per second to the bucket.
-	// It is computed from LoginCapacity over the full LoginWindow.
-	LoginRefillRate = 0.2
-
-	// RegisterCapacity is the maximum number of registration requests allowed per IP within the token bucket.
-	RegisterCapacity = 1
-
-	// RegisterWindow is the time window for registration rate limiting (1 hour).
-	RegisterWindow = 1 * time.Hour
-
-	// RegisterRefillRate is the number of registration tokens added per second to the bucket.
-	// It is computed from RegisterCapacity over the full RegisterWindow.
-	RegisterRefillRate = 0.001
+	defaultRegisterCapacity = 1
+	defaultRegisterWindow   = 1 * time.Hour
 
 	// Authenticated request rate limit values by HTTP method.
-	AuthWindow = 1 * time.Minute
+	defaultAuthWindow = 1 * time.Minute
+)
 
-	GetCapacity      = 60
+var (
+	LoginCapacity   = float64(config.GetInt("LOGIN_CAPACITY", defaultLoginCapacity))
+	LoginWindow     = config.GetDuration("LOGIN_WINDOW", defaultLoginWindow)
+	LoginRefillRate = float64(LoginCapacity) / LoginWindow.Seconds()
+
+	RegisterCapacity   = float64(config.GetInt("REGISTER_CAPACITY", defaultRegisterCapacity))
+	RegisterWindow     = config.GetDuration("REGISTER_WINDOW", defaultRegisterWindow)
+	RegisterRefillRate = float64(RegisterCapacity) / RegisterWindow.Seconds()
+
+	AuthWindow = config.GetDuration("AUTH_WINDOW", defaultAuthWindow)
+
+	GetCapacity      = 60.0
 	GetRefillRate    = float64(GetCapacity) / 60.0
-	PostCapacity     = 30
+	PostCapacity     = 30.0
 	PostRefillRate   = float64(PostCapacity) / 60.0
-	PutCapacity      = 20
+	PutCapacity      = 20.0
 	PutRefillRate    = float64(PutCapacity) / 60.0
-	DeleteCapacity   = 10
+	DeleteCapacity   = 10.0
 	DeleteRefillRate = float64(DeleteCapacity) / 60.0
 
 	// Endpoint-specific capacities for authenticated routes.
-	GetAccountsCapacity    = 40
-	GetAccountCapacity     = 30
-	GetTransactionCapacity = 20
-	GetEntriesCapacity     = 25
-	PutReconcileCapacity   = 15
-	PostAccountsCapacity   = 15
-	PostDepositCapacity    = 20
-	PostWithdrawCapacity   = 20
-	PostTransfersCapacity  = 10
-	DeleteAccountCapacity  = 5
+	GetAccountsCapacity    = 40.0
+	GetAccountCapacity     = 30.0
+	GetTransactionCapacity = 20.0
+	GetEntriesCapacity     = 25.0
+	PutReconcileCapacity   = 15.0
+	PostAccountsCapacity   = 15.0
+	PostDepositCapacity    = 20.0
+	PostWithdrawCapacity   = 20.0
+	PostTransfersCapacity  = 10.0
+	DeleteAccountCapacity  = 5.0
 )
 
 // RateLimitConfig holds the configuration for a rate limiter endpoint.
@@ -141,17 +140,77 @@ func AuthConfig(method, endpoint string) RateLimitConfig {
 	}
 }
 
+var allowRequestScript = redis.NewScript(`
+-- KEYS[1] is the Redis key used to track this identifier's token bucket.
+-- ARGV[1] is the bucket capacity 
+-- ARGV[2] is refill rate per second
+-- ARGV[3] is the current UNIX timestamp
+-- ARGV[4] is key expiry in seconds.
+
+local key = KEYS[1]
+local capacity = tonumber(ARGV[1])
+local refillRate = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local expiry = tonumber(ARGV[4])
+
+-- Read the current bucket state from Redis.
+-- data[1] = tokens, data[2] = last_refill
+local data = redis.call("HMGET", key, "tokens", "last_refill")
+local tokens = capacity
+local lastRefill = now
+
+-- If we already have stored tokens, parse them.
+if data[1] and data[1] ~= false and data[1] ~= "" then
+	tokens = tonumber(data[1]) or capacity
+end
+
+-- If we already have a previous refill timestamp, parse it.
+if data[2] and data[2] ~= false and data[2] ~= "" then
+	lastRefill = tonumber(data[2]) or now
+end
+
+-- Prevent using a future timestamp if the stored value is ahead of now.
+if lastRefill > now then
+	lastRefill = now
+end
+
+-- Refill tokens based on elapsed seconds.
+local elapsed = now - lastRefill
+tokens = tokens + elapsed * refillRate
+
+-- Cap tokens at the maximum bucket capacity.
+if tokens > capacity then
+	tokens = capacity
+end
+
+-- Update the last refill time to now.
+lastRefill = now
+
+-- If no tokens remain, deny the request.
+if tokens < 1 then
+	return 0
+end
+
+-- Consume one token for this request.
+tokens = tokens - 1
+
+-- Persist the updated bucket state atomically.
+redis.call("HSET", key, "tokens", tostring(tokens), "last_refill", tostring(lastRefill))
+redis.call("EXPIRE", key, expiry)
+return 1
+`)
+
 // NewRedisClient constructs a Redis client configured for local development.
 func NewRedisClient() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:         "localhost:6379",
-		Password:     "RedisPassword",
-		DB:           0,
-		PoolSize:     10,
-		MinIdleConns: 5,
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
+		Addr:         config.GetString("REDIS_ADDR", "localhost:6379"),
+		Password:     config.GetString("REDIS_PASSWORD", "Password"),
+		DB:           config.GetInt("REDIS_DB", 0),
+		PoolSize:     config.GetInt("REDIS_POOL_SIZE", 10),
+		MinIdleConns: config.GetInt("REDIS_MIN_IDLE_CONNS", 5),
+		DialTimeout:  config.GetDuration("REDIS_DIAL_TIMEOUT", 5*time.Second),
+		ReadTimeout:  config.GetDuration("REDIS_READ_TIMEOUT", 3*time.Second),
+		WriteTimeout: config.GetDuration("REDIS_WRITE_TIMEOUT", 3*time.Second),
 	})
 }
 
@@ -168,58 +227,17 @@ func NewRedisClient() *redis.Client {
 func AllowRequest(ctx context.Context, rdb *redis.Client, config RateLimitConfig, identifier string) (bool, error) {
 	key := config.KeyPrefix + ":" + identifier
 	now := time.Now().Unix()
+	expiry := int(config.Window.Seconds() + 60)
 
-	data, err := rdb.HGetAll(ctx, key).Result()
+	result, err := allowRequestScript.Run(ctx, rdb, []string{key}, config.Capacity, config.RefillRate, now, expiry).Result()
 	if err != nil {
 		return false, err
 	}
 
-	// Start with a full bucket by default.
-	tokens := config.Capacity
-	lastRefill := now
-
-	if len(data) != 0 {
-		parsedTokens, err := strconv.ParseFloat(data["tokens"], 64)
-		if err == nil {
-			tokens = parsedTokens
-		}
-
-		parsedLastRefill, err := strconv.ParseInt(data["last_refill"], 10, 64)
-		if err == nil {
-			lastRefill = parsedLastRefill
-		}
-
-		// Guard against clocks or stale data reporting a future refill time.
-		if lastRefill > now {
-			lastRefill = now
-		}
-
-		elapsed := float64(now - lastRefill)
-		tokens += elapsed * config.RefillRate
-		if tokens > config.Capacity {
-			tokens = config.Capacity
-		}
-		lastRefill = now
+	allowed, ok := result.(int64)
+	if !ok {
+		return false, fmt.Errorf("unexpected Redis script result type: %T", result)
 	}
 
-	// Deny if there are no tokens available.
-	if tokens < 1 {
-		return false, nil
-	}
-
-	// Consume one token for the current request.
-	tokens--
-
-	err = rdb.HSet(ctx, key,
-		"tokens", strconv.FormatFloat(tokens, 'f', -1, 64),
-		"last_refill", strconv.FormatInt(lastRefill, 10),
-	).Err()
-	if err != nil {
-		return false, err
-	}
-
-	// Keep the rate limit record alive for a little longer than the window so that
-	// identifiers that stop making requests are eventually removed from Redis.
-	rdb.Expire(ctx, key, config.Window+time.Minute)
-	return true, nil
+	return allowed == 1, nil
 }
