@@ -22,6 +22,22 @@ const (
 
 	// Authenticated request rate limit values by HTTP method.
 	defaultAuthWindow = 1 * time.Minute
+
+	defaultGetCapacity    = 60
+	defaultPostCapacity   = 30
+	defaultPutCapacity    = 20
+	defaultDeleteCapacity = 10
+
+	defaultGetAccountsCapacity    = 40
+	defaultGetAccountCapacity     = 30
+	defaultGetTransactionCapacity = 20
+	defaultGetEntriesCapacity     = 25
+	defaultPutReconcileCapacity   = 15
+	defaultPostAccountsCapacity   = 15
+	defaultPostDepositCapacity    = 20
+	defaultPostWithdrawCapacity   = 20
+	defaultPostTransfersCapacity  = 10
+	defaultDeleteAccountCapacity  = 5
 )
 
 var (
@@ -35,26 +51,26 @@ var (
 
 	AuthWindow = config.GetDuration("AUTH_WINDOW", defaultAuthWindow)
 
-	GetCapacity      = 60.0
-	GetRefillRate    = float64(GetCapacity) / 60.0
-	PostCapacity     = 30.0
-	PostRefillRate   = float64(PostCapacity) / 60.0
-	PutCapacity      = 20.0
-	PutRefillRate    = float64(PutCapacity) / 60.0
-	DeleteCapacity   = 10.0
-	DeleteRefillRate = float64(DeleteCapacity) / 60.0
+	GetCapacity      = float64(config.GetInt("AUTH_GET_CAPACITY", defaultGetCapacity))
+	GetRefillRate    = float64(GetCapacity) / AuthWindow.Seconds()
+	PostCapacity     = float64(config.GetInt("AUTH_POST_CAPACITY", defaultPostCapacity))
+	PostRefillRate   = float64(PostCapacity) / AuthWindow.Seconds()
+	PutCapacity      = float64(config.GetInt("AUTH_PUT_CAPACITY", defaultPutCapacity))
+	PutRefillRate    = float64(PutCapacity) / AuthWindow.Seconds()
+	DeleteCapacity   = float64(config.GetInt("AUTH_DELETE_CAPACITY", defaultDeleteCapacity))
+	DeleteRefillRate = float64(DeleteCapacity) / AuthWindow.Seconds()
 
 	// Endpoint-specific capacities for authenticated routes.
-	GetAccountsCapacity    = 40.0
-	GetAccountCapacity     = 30.0
-	GetTransactionCapacity = 20.0
-	GetEntriesCapacity     = 25.0
-	PutReconcileCapacity   = 15.0
-	PostAccountsCapacity   = 15.0
-	PostDepositCapacity    = 20.0
-	PostWithdrawCapacity   = 20.0
-	PostTransfersCapacity  = 10.0
-	DeleteAccountCapacity  = 5.0
+	GetAccountsCapacity    = float64(config.GetInt("AUTH_GET_ACCOUNTS_CAPACITY", defaultGetAccountsCapacity))
+	GetAccountCapacity     = float64(config.GetInt("AUTH_GET_ACCOUNT_CAPACITY", defaultGetAccountCapacity))
+	GetTransactionCapacity = float64(config.GetInt("AUTH_GET_TRANSACTION_CAPACITY", defaultGetTransactionCapacity))
+	GetEntriesCapacity     = float64(config.GetInt("AUTH_GET_ENTRIES_CAPACITY", defaultGetEntriesCapacity))
+	PutReconcileCapacity   = float64(config.GetInt("AUTH_PUT_RECONCILE_CAPACITY", defaultPutReconcileCapacity))
+	PostAccountsCapacity   = float64(config.GetInt("AUTH_POST_ACCOUNTS_CAPACITY", defaultPostAccountsCapacity))
+	PostDepositCapacity    = float64(config.GetInt("AUTH_POST_DEPOSIT_CAPACITY", defaultPostDepositCapacity))
+	PostWithdrawCapacity   = float64(config.GetInt("AUTH_POST_WITHDRAW_CAPACITY", defaultPostWithdrawCapacity))
+	PostTransfersCapacity  = float64(config.GetInt("AUTH_POST_TRANSFERS_CAPACITY", defaultPostTransfersCapacity))
+	DeleteAccountCapacity  = float64(config.GetInt("AUTH_DELETE_ACCOUNT_CAPACITY", defaultDeleteAccountCapacity))
 )
 
 // RateLimitConfig holds the configuration for a rate limiter endpoint.
