@@ -80,6 +80,15 @@ func (r *EntryRepository) GetEntriesByAccountID(accountID uuid.UUID) ([]models.E
 	return entries, nil
 }
 
+func (r *EntryRepository) DeleteEntriesByAccountID(accountID uuid.UUID) error {
+	query := `DELETE FROM entries WHERE account_id = $1`
+	_, err := r.DB.Exec(query, accountID)
+	if err != nil {
+		return fmt.Errorf("error deleting entries for account: %w", err)
+	}
+	return nil
+}
+
 func (r *EntryRepository) GetEntriesByTransactionID(transactionID uuid.UUID) ([]models.Entry, error) {
 	query := `SELECT id, account_id, user_id, debit, credit, transaction_id, operation_type, description, created_at 
 	          FROM entries WHERE transaction_id = $1`

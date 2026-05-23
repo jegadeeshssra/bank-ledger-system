@@ -1,119 +1,155 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
+	redisstore "ledger-system/redis"
 	"ledger-system/utils"
 
 	"github.com/google/uuid"
 )
 
-type loginAttempt struct {
-	count int
-	first time.Time
+type loginRequestPayload struct {
+	Username string `json:"username"`
 }
 
-type ipRateLimiter struct {
-	mu          sync.Mutex
-	requests    map[string]*loginAttempt
-	maxAttempts int
-	window      time.Duration
-}
+var RedisClient = redisstore.NewRedisClient()
 
-type globalRateLimiter struct {
-	mu          sync.Mutex
-	count       int
-	first       time.Time
-	maxRequests int
-	window      time.Duration
-}
-
-func newIPRateLimiter(maxAttempts int, window time.Duration) *ipRateLimiter {
-	return &ipRateLimiter{
-		requests:    make(map[string]*loginAttempt),
-		maxAttempts: maxAttempts,
-		window:      window,
-	}
-}
-
-func newGlobalRateLimiter(maxRequests int, window time.Duration) *globalRateLimiter {
-	return &globalRateLimiter{
-		maxRequests: maxRequests,
-		window:      window,
-	}
-}
-
-// Limits the request rate based on the src ip for a fixed window.
-func (l *ipRateLimiter) Allow(ip string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := time.Now()
-	attempt, ok := l.requests[ip]
-	if !ok || now.Sub(attempt.first) > l.window {
-		l.requests[ip] = &loginAttempt{count: 1, first: now}
-		return true
+func extractLoginUsername(r *http.Request) (string, error) {
+	if r.Body == nil {
+		return "", nil
 	}
 
-	if attempt.count >= l.maxAttempts {
-		return false
-	}
-
-	attempt.count++
-	return true
-}
-
-func (l *globalRateLimiter) Allow() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := time.Now()
-	// It checks whether the time.Time has never been set (or was explicitly set to zero).
-	if l.first.IsZero() || now.Sub(l.first) > l.window {
-		l.count = 1
-		l.first = now
-		return true
-	}
-
-	if l.count >= l.maxRequests {
-		return false
-	}
-
-	l.count++
-	return true
-}
-
-// func (l *ipRateLimiter) Reset(ip string) {
-// 	l.mu.Lock()
-// 	defer l.mu.Unlock()
-// 	delete(l.requests, ip)
-// }
-
-func getClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	if rip := r.Header.Get("X-Real-IP"); rip != "" {
-		return strings.TrimSpace(rip)
-	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		return strings.TrimSpace(r.RemoteAddr)
+		return "", err
 	}
-	return ip
-}
 
-var LoginRateLimiter = newIPRateLimiter(5, 5*time.Minute)
-var GlobalLoginRateLimiter = newGlobalRateLimiter(20, 5*time.Minute)
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+	var payload loginRequestPayload
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		return "", nil
+	}
+
+	return payload.Username, nil
+}
 
 // JWTMiddleware validates JWT tokens and adds user ID to request context
+func extractClientIP(r *http.Request) (string, error) {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			ip := strings.TrimSpace(parts[0])
+			if ip != "" {
+				return ip, nil
+			}
+		}
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		if r.RemoteAddr != "" {
+			return r.RemoteAddr, nil
+		}
+		return "", err
+	}
+	return host, nil
+}
+
+func extractUserIdentifier(r *http.Request) (string, error) {
+	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	if !ok {
+		return "", fmt.Errorf("user ID missing in context")
+	}
+	return userID.String(), nil
+}
+
+func extractLoginIdentifier(r *http.Request) (string, error) {
+	username, err := extractLoginUsername(r)
+	if err != nil {
+		return "", err
+	}
+	return username, nil
+}
+
+// GetUserIDFromContext extracts user ID from request context
+func GetUserIDFromContext(r *http.Request) (uuid.UUID, bool) {
+	userID, ok := r.Context().Value("userID").(uuid.UUID)
+	return userID, ok
+}
+
+// LoginRateLimitMiddleware enforces a per-username token bucket on the login endpoint.
+func LoginRateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return rateLimitMiddleware(redisstore.LoginConfig(), extractLoginIdentifier, "Too many login attempts for this user. Please try again in 5 minutes.")(next)
+}
+
+// RegisterRateLimitMiddleware enforces a per-IP token bucket on the register endpoint.
+func RegisterRateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return rateLimitMiddleware(redisstore.RegisterConfig(), extractClientIP, "Too many registration attempts from this IP. Please try again later.")(next)
+}
+
+func AuthRateLimitMiddleware(method, endpoint string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			identifier, err := extractUserIdentifier(r)
+			if err != nil {
+				http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+
+			config := redisstore.AuthConfig(method, endpoint)
+			allowed, err := redisstore.AllowRequest(r.Context(), RedisClient, config, identifier)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed {
+				http.Error(w, fmt.Sprintf(`{"error": "Rate limit exceeded for %s %s. Try again later."}`, strings.ToUpper(method), endpoint), http.StatusTooManyRequests)
+				return
+			}
+
+			next(w, r)
+		}
+	}
+}
+
+func rateLimitMiddleware(config redisstore.RateLimitConfig, extractIdentifier func(*http.Request) (string, error), errorMessage string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+
+			identifier, err := extractIdentifier(r)
+			if err != nil || identifier == "" {
+				if err != nil {
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				next(w, r)
+				return
+			}
+
+			allowed, err := redisstore.AllowRequest(r.Context(), RedisClient, config, identifier)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed {
+				http.Error(w, errorMessage, http.StatusTooManyRequests)
+				return
+			}
+
+			next(w, r)
+		}
+	}
+}
+
 func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -124,7 +160,6 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Check if it starts with "Bearer "
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			http.Error(w, `{"error": "Invalid authorization header format. Use 'Bearer <token>'"}`, http.StatusUnauthorized)
 			return
@@ -142,35 +177,9 @@ func JWTMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Add user ID to request context
 		ctx := context.WithValue(r.Context(), "userID", userID)
 		r = r.WithContext(ctx)
 
 		next(w, r)
 	}
-}
-
-// RateLimitMiddleware limits the number of requests per IP for login attempts
-// and also enforces a global limit of 20 login requests per 5 minute window.
-func RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		clientIP := getClientIP(r)
-		if !LoginRateLimiter.Allow(clientIP) {
-			http.Error(w, "Too many login attempts from this IP. Please try again in 5 minutes.", http.StatusTooManyRequests)
-			return
-		}
-
-		if !GlobalLoginRateLimiter.Allow() {
-			http.Error(w, "Too many login attempts globally. Please try again in 5 minutes.", http.StatusTooManyRequests)
-			return
-		}
-
-		next(w, r)
-	}
-}
-
-// GetUserIDFromContext extracts user ID from request context
-func GetUserIDFromContext(r *http.Request) (uuid.UUID, bool) {
-	userID, ok := r.Context().Value("userID").(uuid.UUID)
-	return userID, ok
 }

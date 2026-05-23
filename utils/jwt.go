@@ -30,7 +30,7 @@ type CustomJWTClaims struct {
 // GenerateJWT generates a JWT token with user ID as subject
 func GenerateJWT(userID uuid.UUID) (string, error) {
 	now := time.Now()
-	expirationTime := now.Add(24 * time.Hour) // Token expires in 24 hours
+	expirationTime := now.Add(5 * time.Minute) // Token expires in 24 hours
 
 	// // Create RegisteredClaims
 	// claims := &jwt.RegisteredClaims{

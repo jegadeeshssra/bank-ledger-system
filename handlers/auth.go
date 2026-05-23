@@ -97,7 +97,7 @@ func (a *AuthServer) Login(w http.ResponseWriter, r *http.Request) {
 		"user_id":      user.ID,
 		"username":     user.Username,
 		"message":      "Login successful",
-		"expires_in":   "24h",
+		"expires_in":   "5m",
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)

@@ -44,22 +44,22 @@ func main() {
 	authSrv := handlers.NewAuthServer(userRepo)
 
 	// Use Go 1.22+ clean method-based routing
-	http.HandleFunc("POST /register", authSrv.Register)
-	http.HandleFunc("POST /login", middleware.RateLimitMiddleware(authSrv.Login))
+	http.HandleFunc("POST /register", middleware.RegisterRateLimitMiddleware(authSrv.Register))
+	http.HandleFunc("POST /login", middleware.LoginRateLimitMiddleware(authSrv.Login))
 
-	http.HandleFunc("GET /accounts", middleware.JWTMiddleware(srv.ListAccounts))
-	http.HandleFunc("GET /accounts/{id}", middleware.JWTMiddleware(srv.GetAccount))
-	http.HandleFunc("GET /accounts/{id}/transactions/{transaction_id}", middleware.JWTMiddleware(srv.GetTransaction))
-	http.HandleFunc("GET /accounts/{id}/entries", middleware.JWTMiddleware(srv.GetEntries))
+	http.HandleFunc("GET /accounts", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("GET", "getaccounts")(srv.ListAccounts)))
+	http.HandleFunc("GET /accounts/{id}", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("GET", "getaccount")(srv.GetAccount)))
+	http.HandleFunc("GET /accounts/{id}/transactions/{transaction_id}", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("GET", "gettransaction")(srv.GetTransaction)))
+	http.HandleFunc("GET /accounts/{id}/entries", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("GET", "getentries")(srv.GetEntries)))
 
-	http.HandleFunc("PUT /accounts/{id}/reconcile", middleware.JWTMiddleware(srv.Reconcile))
+	http.HandleFunc("PUT /accounts/{id}/reconcile", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("PUT", "reconcile")(srv.Reconcile)))
 
-	http.HandleFunc("POST /accounts", middleware.JWTMiddleware(srv.CreateAccount))
-	http.HandleFunc("POST /accounts/{id}/deposit", middleware.JWTMiddleware(srv.Deposit))
-	http.HandleFunc("POST /accounts/{id}/withdraw", middleware.JWTMiddleware(srv.Withdraw))
-	http.HandleFunc("POST /accounts/{id}/transfers", middleware.JWTMiddleware(srv.Transfer))
+	http.HandleFunc("POST /accounts", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "createaccount")(srv.CreateAccount)))
+	http.HandleFunc("POST /accounts/{id}/deposit", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "deposit")(srv.Deposit)))
+	http.HandleFunc("POST /accounts/{id}/withdraw", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "withdraw")(srv.Withdraw)))
+	http.HandleFunc("POST /accounts/{id}/transfers", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "transfer")(srv.Transfer)))
 
-	http.HandleFunc("DELETE /accounts/{id}", middleware.JWTMiddleware(srv.DeleteAccount))
+	http.HandleFunc("DELETE /accounts/{id}", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("DELETE", "deleteaccount")(srv.DeleteAccount)))
 
 	// 5. Start the server on 8081 (since 8080 is used by playing-with-DB)
 	fmt.Println("Ledger API Server starting on http://localhost:8081")

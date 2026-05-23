@@ -37,6 +37,12 @@ func (s *Server) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = s.entryRepo.DeleteEntriesByAccountID(id)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
 	err = s.accRepo.DeleteAccount(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusInternalServerError)
