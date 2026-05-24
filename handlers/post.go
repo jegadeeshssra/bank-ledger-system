@@ -250,7 +250,7 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
-
+	fmt.Println(reqBody.ToAccountID)
 	// Validate request body
 	if err := ValidateRequest(w, reqBody); err != nil {
 		return
@@ -278,7 +278,7 @@ func (s *Server) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toAcc, err := s.accRepo.GetAccountByUserID(reqBody.ToAccountID, userID)
+	toAcc, err := s.accRepo.GetAccount(reqBody.ToAccountID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusInternalServerError)
 		return

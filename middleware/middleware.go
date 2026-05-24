@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	redisstore "ledger-system/redis"
 	"ledger-system/utils"
@@ -118,6 +119,110 @@ func AuthRateLimitMiddleware(method, endpoint string) func(http.HandlerFunc) htt
 
 			next(w, r)
 		}
+	}
+}
+
+func normalizeRequestBody(body []byte) string {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return ""
+	}
+
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, body); err == nil {
+		return buf.String()
+	}
+
+	return string(body)
+}
+
+type idempotencyResponseWriter struct {
+	http.ResponseWriter
+	status int
+	body   bytes.Buffer
+}
+
+func (rw *idempotencyResponseWriter) WriteHeader(statusCode int) {
+	rw.status = statusCode
+	rw.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (rw *idempotencyResponseWriter) Write(b []byte) (int, error) {
+	rw.body.Write(b)
+	return rw.ResponseWriter.Write(b)
+}
+
+func IdempotencyMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idempotencyKey := r.Header.Get("X-Idempotency-Key")
+		if idempotencyKey == "" {
+			http.Error(w, `{"error": "Idempotency-Key header required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if _, err := uuid.Parse(idempotencyKey); err != nil {
+			http.Error(w, `{"error": "Invalid Idempotency-Key format. Must be a UUID."}`, http.StatusBadRequest)
+			return
+		}
+
+		userID, err := extractUserIdentifier(r)
+		if err != nil {
+			http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, `{"error": "Failed to read request body"}`, http.StatusInternalServerError)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+		normalizedBody := normalizeRequestBody(bodyBytes)
+		redisKey := fmt.Sprintf("idempotent:%s:%s", userID, normalizedBody)
+
+		cached, err := redisstore.GetStringValue(r.Context(), RedisClient, redisKey)
+		if err != nil {
+			http.Error(w, `{"error": "Internal server error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if cached != "" {
+			var cachedResponse struct {
+				Status int    `json:"status"`
+				Body   string `json:"body"`
+			}
+			if err := json.Unmarshal([]byte(cached), &cachedResponse); err == nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(cachedResponse.Status)
+				_, _ = w.Write([]byte(cachedResponse.Body))
+				return
+			}
+		}
+
+		recorder := &idempotencyResponseWriter{ResponseWriter: w}
+		next(recorder, r)
+
+		if recorder.status == 0 {
+			recorder.status = http.StatusOK
+		}
+		if recorder.status < 200 || recorder.status >= 300 {
+			return
+		}
+
+		if recorder.body.Len() == 0 {
+			return
+		}
+
+		cachedPayload, err := json.Marshal(map[string]any{
+			"status": recorder.status,
+			"body":   recorder.body.String(),
+		})
+		if err != nil {
+			return
+		}
+
+		_, _ = redisstore.SetNXString(r.Context(), RedisClient, redisKey, string(cachedPayload), 24*time.Hour)
 	}
 }
 

@@ -257,3 +257,18 @@ func AllowRequest(ctx context.Context, rdb *redis.Client, config RateLimitConfig
 
 	return allowed == 1, nil
 }
+
+// GetStringValue returns the string value stored at the given key or an empty string when the key does not exist.
+func GetStringValue(ctx context.Context, rdb *redis.Client, key string) (string, error) {
+	value, err := rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return value, err
+}
+
+// SetNXString stores the key/value pair only if the key does not already exist.
+func SetNXString(ctx context.Context, rdb *redis.Client, key, value string, ttl time.Duration) (bool, error) {
+	ok, err := rdb.SetNX(ctx, key, value, ttl).Result()
+	return ok, err
+}

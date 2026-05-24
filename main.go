@@ -55,9 +55,9 @@ func main() {
 	http.HandleFunc("PUT /accounts/{id}/reconcile", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("PUT", "reconcile")(srv.Reconcile)))
 
 	http.HandleFunc("POST /accounts", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "createaccount")(srv.CreateAccount)))
-	http.HandleFunc("POST /accounts/{id}/deposit", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "deposit")(srv.Deposit)))
-	http.HandleFunc("POST /accounts/{id}/withdraw", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "withdraw")(srv.Withdraw)))
-	http.HandleFunc("POST /accounts/{id}/transfers", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "transfer")(srv.Transfer)))
+	http.HandleFunc("POST /accounts/{id}/deposit", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "deposit")(middleware.IdempotencyMiddleware(srv.Deposit))))
+	http.HandleFunc("POST /accounts/{id}/withdraw", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "withdraw")(middleware.IdempotencyMiddleware(srv.Withdraw))))
+	http.HandleFunc("POST /accounts/{id}/transfers", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("POST", "transfer")(middleware.IdempotencyMiddleware(srv.Transfer))))
 
 	http.HandleFunc("DELETE /accounts/{id}", middleware.JWTMiddleware(middleware.AuthRateLimitMiddleware("DELETE", "deleteaccount")(srv.DeleteAccount)))
 
