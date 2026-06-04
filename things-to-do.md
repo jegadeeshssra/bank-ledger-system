@@ -2,10 +2,12 @@
 - should create indexes for accountids   
 - async DB operation
 - Prevent double login for the same account
-- refresh token
+- refresh token & secret key rotation
 - distributed redis and ledger using raft
 - write tests to simulate 5000 users    
-
+- will have to check whether the response time of redis requests in less than 1ms
+- api versioning
+- pagination
 
 
 Things-we-done
@@ -19,3 +21,54 @@ Things-we-done
 - Token Bucket Algo for rate limiting all endpoints
 - Request and Response Validation
 - Idempotency behaviour for /withdraw , /deposit , /transfer
+
+OWASP
+- Broken Object Level Authorization 
+    - /accounts/{my-id} -> /accounts/{other-id} cannot happen bcuz we only use the account-id if its from the user-id from the jwt
+- Broken Authentication
+    - Weak JWT secret
+    - Must validate : signature , exp , issuer
+    - always enforce jwt.SigningMethodHS256
+- Unrestricted Resource Consumption
+    - Rate Limiting
+
+
+CHECK-LIST
+----------
+AUTHORIZATION
+
+□ object ownership checks
+□ admin role checks
+
+AUTHENTICATION
+
+□ JWT expiry
+□ signature validation
+□ secret rotation
+
+TRANSACTIONAL SAFETY
+
+□ DB transactions
+□ FOR UPDATE
+□ idempotency
+
+RATE LIMITING
+
+□ Redis token bucket
+□ Lua atomic updates
+
+INPUT VALIDATION
+
+□ UUID validation
+□ amount validation
+□ JSON unknown fields
+
+INJECTION
+
+□ parameterized SQL everywhere
+
+CONFIGURATION
+
+□ HTTPS
+□ secure Redis
+□ secure env vars
