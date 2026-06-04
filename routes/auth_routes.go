@@ -7,10 +7,10 @@ import (
 	"ledger-system/middleware"
 )
 
-// RegisterAuthRoutes registers all authentication-related routes
+// RegisterAuthRoutes registers all v1 authentication-related routes
 func RegisterAuthRoutes(authSrv *handlers.AuthServer) {
 	// Public routes - no authentication required
-	http.HandleFunc("POST /register", middleware.RegisterRateLimitMiddleware(authSrv.Register))
-	http.HandleFunc("POST /login", middleware.LoginRateLimitMiddleware(authSrv.Login))
-	http.HandleFunc("POST /refresh", authSrv.Refresh)
+	http.HandleFunc("POST /api/v1/auth/register", middleware.RegisterRateLimitMiddleware(authSrv.Register))
+	http.HandleFunc("POST /api/v1/auth/login", middleware.LoginRateLimitMiddleware(authSrv.Login))
+	http.HandleFunc("POST /api/v1/auth/refresh", authSrv.Refresh)
 }

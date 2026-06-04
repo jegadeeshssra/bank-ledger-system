@@ -2,11 +2,10 @@
 - should create indexes for accountids   
 - async DB operation
 - Prevent double login for the same account
-- refresh token & secret key rotation
+- secret key rotation
 - distributed redis and ledger using raft
 - write tests to simulate 5000 users    
 - will have to check whether the response time of redis requests in less than 1ms
-- api versioning
 - pagination
 
 
@@ -24,7 +23,7 @@ Things-we-done
 
 OWASP
 - Broken Object Level Authorization 
-    - /accounts/{my-id} -> /accounts/{other-id} cannot happen bcuz we only use the account-id if its from the user-id from the jwt
+    - /accounts/{my-id} -> /accounts/{other-id} cannot happen bcuz we only use the account-id if its from the user-id from the jwt using sql query
 - Broken Authentication
     - Weak JWT secret
     - Must validate : signature , exp , issuer
