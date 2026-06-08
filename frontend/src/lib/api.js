@@ -1,7 +1,33 @@
 import { useAuthStore } from '@/stores/authStore'
 
+const env = import.meta.env
 const API_BASE_PATH = import.meta.env.VITE_API_BASE_PATH || '/api/v1'
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || API_BASE_PATH
+const API_BASE_URL = env.VITE_API_BASE_URL
+const BACKEND_PROTOCOL = (env.VITE_BACKEND_PROTOCOL || 'https').replace(/:$/, '')
+const BACKEND_DOMAIN = env.VITE_BACKEND_DOMAIN || ''
+const BACKEND_PORT = env.VITE_BACKEND_PORT || ''
+
+function getBackendOrigin() {
+  if (!BACKEND_DOMAIN) return ''
+
+  try {
+    const rawTarget = /^https?:\/\//i.test(BACKEND_DOMAIN)
+      ? BACKEND_DOMAIN
+      : `${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}`
+    const targetUrl = new URL(rawTarget)
+
+    if (BACKEND_PORT) {
+      targetUrl.port = BACKEND_PORT
+    }
+
+    return targetUrl.origin
+  } catch {
+    return ''
+  }
+}
+
+const BACKEND_ORIGIN = getBackendOrigin()
+const BASE_URL = API_BASE_URL || (BACKEND_ORIGIN ? `${BACKEND_ORIGIN}${API_BASE_PATH}` : API_BASE_PATH)
 
 export function generateIdempotencyKey() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

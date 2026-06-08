@@ -7,10 +7,27 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "")
 
   const frontendPort = Number(env.VITE_FRONTEND_PORT || 5173)
-  const backendProtocol = env.VITE_BACKEND_PROTOCOL || "https"
-  const backendDomain = env.VITE_BACKEND_DOMAIN
-  const backendPort = env.VITE_BACKEND_PORT || "8081"
-  const backendTarget = `${backendProtocol}://${backendDomain}:${backendPort}`
+  const backendProtocol = (env.VITE_BACKEND_PROTOCOL || "https").replace(/:$/, "")
+  const backendDomain = env.VITE_BACKEND_DOMAIN || "localhost"
+  const backendPort = env.VITE_BACKEND_PORT || ""
+
+  let backendTarget = `${backendProtocol}://${backendDomain}`
+  try {
+    const rawTarget = /^https?:\/\//i.test(backendDomain)
+      ? backendDomain
+      : `${backendProtocol}://${backendDomain}`
+    const targetUrl = new URL(rawTarget)
+
+    if (backendPort) {
+      targetUrl.port = backendPort
+    }
+
+    backendTarget = targetUrl.origin
+  } catch {
+    if (backendPort) {
+      backendTarget = `${backendTarget}:${backendPort}`
+    }
+  }
 
   return {
     plugins: [react(), tailwindcss()],
