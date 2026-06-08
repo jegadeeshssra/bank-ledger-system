@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
+	"ledger-system/config"
 	"ledger-system/db"
 	"ledger-system/handlers"
 	"ledger-system/middleware"
@@ -52,8 +54,18 @@ func main() {
 	// 5. Register all routes
 	routes.RegisterAllRoutes(srv, authSrv)
 
-	// 6. Start the server on 8081 (since 8080 is used by playing-with-DB)
-	fmt.Println("Ledger API Server starting on http://localhost:8081")
+	// 6. Start the server using PORT/BACKEND_PORT from env
+	port := config.GetString("PORT", "")
+	if port == "" {
+		port = config.GetString("BACKEND_PORT", "443")
+	}
+	port = strings.TrimPrefix(strings.TrimSpace(port), ":")
+	if port == "" {
+		port = "443"
+	}
+	listenAddr := ":" + port
+
+	fmt.Printf("Ledger API Server starting on https://server:%s\n", port)
 	handler := middleware.CORSMiddleware(http.DefaultServeMux)
-	log.Fatal(http.ListenAndServe(":8081", handler))
+	log.Fatal(http.ListenAndServe(listenAddr, handler))
 }
