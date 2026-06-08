@@ -4,7 +4,9 @@ package redisstore
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -218,16 +220,46 @@ return 1
 
 // NewRedisClient constructs a Redis client configured for local development.
 func NewRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:         config.GetString("REDIS_ADDR", "localhost:6379"),
-		Password:     config.GetString("REDIS_PASSWORD", "Password"),
-		DB:           config.GetInt("REDIS_DB", 0),
-		PoolSize:     config.GetInt("REDIS_POOL_SIZE", 10),
-		MinIdleConns: config.GetInt("REDIS_MIN_IDLE_CONNS", 5),
-		DialTimeout:  config.GetDuration("REDIS_DIAL_TIMEOUT", 5*time.Second),
-		ReadTimeout:  config.GetDuration("REDIS_READ_TIMEOUT", 3*time.Second),
-		WriteTimeout: config.GetDuration("REDIS_WRITE_TIMEOUT", 3*time.Second),
-	})
+	redisConnString := config.GetString("REDIS_CONN_STRING", "")
+
+	var client *redis.Client
+	if redisConnString != "" {
+		if options, err := redis.ParseURL(redisConnString); err == nil {
+			// ParseURL with rediss:// already sets TLSConfig; ensure ServerName and min version
+			if options.TLSConfig == nil {
+				options.TLSConfig = &tls.Config{}
+			}
+			options.DialTimeout = 15 * time.Second
+			options.ReadTimeout = 10 * time.Second
+			options.WriteTimeout = 10 * time.Second
+			client = redis.NewClient(options)
+		}
+	}
+
+	if client == nil {
+		client = redis.NewClient(&redis.Options{
+			Addr:         config.GetString("REDIS_ADDR", "localhost:6379"),
+			Username:     config.GetString("REDIS_USERNAME", ""),
+			Password:     config.GetString("REDIS_PASSWORD", "Password"),
+			DB:           config.GetInt("REDIS_DB", 0),
+			PoolSize:     config.GetInt("REDIS_POOL_SIZE", 10),
+			MinIdleConns: config.GetInt("REDIS_MIN_IDLE_CONNS", 5),
+			DialTimeout:  config.GetDuration("REDIS_DIAL_TIMEOUT", 5*time.Second),
+			ReadTimeout:  config.GetDuration("REDIS_READ_TIMEOUT", 3*time.Second),
+			WriteTimeout: config.GetDuration("REDIS_WRITE_TIMEOUT", 3*time.Second),
+		})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		log.Printf("Redis connection failed: %v", err)
+		return client
+	}
+
+	log.Println("Redis connected successfully")
+	return client
 }
 
 // AllowRequest checks whether the given identifier is allowed to make a request based on the provided rate limit config.

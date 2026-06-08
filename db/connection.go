@@ -11,7 +11,7 @@ import (
 
 func Connect() (*sql.DB, error) {
 	connStr := config.GetString("DB_CONN_STRING", "")
-	if connStr == "" {
+	if connStr == "s" {
 		host := config.GetString("DB_HOST", "localhost")
 		port := config.GetString("DB_PORT", "5432")
 		user := config.GetString("DB_USER", "postgres")

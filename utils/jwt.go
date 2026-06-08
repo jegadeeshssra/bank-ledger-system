@@ -23,8 +23,8 @@ func init() {
 	}
 	jwtSecret = []byte(secret)
 	jwtIssuer = config.GetString("JWT_ISSUER", "ledger-system")
-	accessTokenExpiry = config.GetDuration("ACCESS_TOKEN_EXPIRY_DURATION", 5*time.Minute)
-	refreshTokenExpiry = config.GetDuration("REFRESH_TOKEN_EXPIRY_DURATION", 30*time.Minute)
+	accessTokenExpiry = config.GetDuration("ACCESS_TOKEN_EXPIRY_DURATION", 1*time.Minute)
+	refreshTokenExpiry = config.GetDuration("REFRESH_TOKEN_EXPIRY_DURATION", 3*time.Minute)
 }
 
 type CustomJWTClaims struct {

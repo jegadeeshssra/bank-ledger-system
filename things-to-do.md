@@ -7,6 +7,7 @@
 - write tests to simulate 5000 users    
 - will have to check whether the response time of redis requests in less than 1ms
 - pagination
+- add HTTPS support
 
 
 Things-we-done
