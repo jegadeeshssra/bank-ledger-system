@@ -7,6 +7,7 @@ import (
 
 	"ledger-system/db"
 	"ledger-system/handlers"
+	"ledger-system/middleware"
 	"ledger-system/repository"
 	"ledger-system/routes"
 )
@@ -53,5 +54,6 @@ func main() {
 
 	// 6. Start the server on 8081 (since 8080 is used by playing-with-DB)
 	fmt.Println("Ledger API Server starting on http://localhost:8081")
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	handler := middleware.CORSMiddleware(http.DefaultServeMux)
+	log.Fatal(http.ListenAndServe(":8081", handler))
 }

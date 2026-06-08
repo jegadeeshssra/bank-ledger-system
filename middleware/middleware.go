@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"ledger-system/config"
 	redisstore "ledger-system/redis"
 	"ledger-system/utils"
 
@@ -22,6 +23,56 @@ type loginRequestPayload struct {
 }
 
 var RedisClient = redisstore.NewRedisClient()
+
+var defaultAllowedOrigins = map[string]struct{}{}
+
+func parseAllowedOrigins() map[string]struct{} {
+	configured := config.GetString("CORS_ALLOWED_ORIGINS", "")
+	if configured == "" {
+		return defaultAllowedOrigins
+	}
+
+	origins := make(map[string]struct{})
+	for _, origin := range strings.Split(configured, ",") {
+		trimmed := strings.TrimSpace(origin)
+		if trimmed != "" {
+			origins[trimmed] = struct{}{}
+		}
+	}
+
+	if len(origins) == 0 {
+		return defaultAllowedOrigins
+	}
+
+	return origins
+}
+
+func isOriginAllowed(origin string, allowed map[string]struct{}) bool {
+	_, ok := allowed[origin]
+	return ok
+}
+
+func CORSMiddleware(next http.Handler) http.Handler {
+	allowedOrigins := parseAllowedOrigins()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" && isOriginAllowed(origin, allowedOrigins) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Idempotency-Key")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 func extractLoginUsername(r *http.Request) (string, error) {
 	if r.Body == nil {
