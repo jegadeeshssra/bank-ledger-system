@@ -7,8 +7,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "")
 
   const frontendPort = Number(env.VITE_FRONTEND_PORT || 5173)
-  const backendProtocol = env.VITE_BACKEND_PROTOCOL || "http"
-  const backendDomain = env.VITE_BACKEND_DOMAIN || "localhost"
+  const backendProtocol = env.VITE_BACKEND_PROTOCOL || "https"
+  const backendDomain = env.VITE_BACKEND_DOMAIN
   const backendPort = env.VITE_BACKEND_PORT || "8081"
   const backendTarget = `${backendProtocol}://${backendDomain}:${backendPort}`
 
