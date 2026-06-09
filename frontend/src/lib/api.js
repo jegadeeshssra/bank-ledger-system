@@ -94,23 +94,24 @@ async function refreshAccessToken() {
 }
 
 async function request(path, options = {}) {
+  const { skipRefresh, ...fetchOptions } = options
   let { token } = useAuthStore.getState()
 
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...fetchOptions.headers,
   }
 
-  let res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  let res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
 
-  // Handle token expiry and refresh
-  if (res.status === 401) {
+  // Handle token expiry and refresh (skip for auth endpoints like login)
+  if (res.status === 401 && !skipRefresh) {
     try {
       const newToken = await refreshAccessToken()
       // Retry the original request with new token
       headers.Authorization = `Bearer ${newToken}`
-      res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+      res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
     } catch (error) {
       useAuthStore.getState().logout()
       window.location.href = '/login'
@@ -152,7 +153,7 @@ export const register = (data) =>
   request('/auth/register', { method: 'POST', body: JSON.stringify(data) })
 
 export const login = (data) =>
-  request('/auth/login', { method: 'POST', body: JSON.stringify(data) })
+  request('/auth/login', { method: 'POST', body: JSON.stringify(data), skipRefresh: true })
 
 export const refresh = (refreshToken) =>
   request('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) })
