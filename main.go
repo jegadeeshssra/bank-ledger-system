@@ -54,15 +54,15 @@ func main() {
 	// 5. Register all routes
 	routes.RegisterAllRoutes(srv, authSrv)
 
-	// 6. Start the server using PORT/BACKEND_PORT from env
+	// 6. Start the server using Render PORT first, then BACKEND_PORT fallback
 	port := config.GetString("BACKEND_PORT", "443")
 	port = strings.TrimPrefix(strings.TrimSpace(port), ":")
 	if port == "" {
 		port = "443"
 	}
-	listenAddr := ":" + port
+	listenAddr := "0.0.0.0:" + port
 
-	fmt.Printf("Ledger API Server starting — listening on :%s\n", port)
+	fmt.Printf("Ledger API Server starting on http://0.0.0.0:%s\n", port)
 	handler := middleware.CORSMiddleware(http.DefaultServeMux)
 	log.Fatal(http.ListenAndServe(listenAddr, handler))
 }
