@@ -55,17 +55,14 @@ func main() {
 	routes.RegisterAllRoutes(srv, authSrv)
 
 	// 6. Start the server using PORT/BACKEND_PORT from env
-	port := config.GetString("PORT", "")
-	if port == "" {
-		port = config.GetString("BACKEND_PORT", "443")
-	}
+	port := config.GetString("BACKEND_PORT", "443")
 	port = strings.TrimPrefix(strings.TrimSpace(port), ":")
 	if port == "" {
 		port = "443"
 	}
 	listenAddr := ":" + port
 
-	fmt.Printf("Ledger API Server starting on https://server:%s\n", port)
+	fmt.Printf("Ledger API Server starting — listening on :%s\n", port)
 	handler := middleware.CORSMiddleware(http.DefaultServeMux)
 	log.Fatal(http.ListenAndServe(listenAddr, handler))
 }
